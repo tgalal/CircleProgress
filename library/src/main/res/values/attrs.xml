@@ -6,6 +6,8 @@
 
         <attr name="circle_unfinished_color" format="color"/>
         <attr name="circle_finished_color" format="color"/>
+        <attr name="circle_finished_drawable" format="reference" />
+        <attr name="circle_unfinished_drawable" format="reference" />
 
         <attr name="circle_text_size" format="dimension"/>
         <attr name="circle_text_color" format="color"/>

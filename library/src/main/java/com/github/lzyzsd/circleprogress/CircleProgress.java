@@ -2,10 +2,18 @@ package com.github.lzyzsd.circleprogress;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.text.TextPaint;
@@ -26,6 +34,10 @@ public class CircleProgress extends View {
     private int max;
     private int finishedColor;
     private int unfinishedColor;
+    private int finishedDrawableId;
+    private int unfinishedDrawableId;
+    private Bitmap finishedBitmap;
+    private Bitmap unfinishedBitmap;
     private String prefixText = "";
     private String suffixText = "%";
 
@@ -41,6 +53,8 @@ public class CircleProgress extends View {
     private static final String INSTANCE_TEXT_SIZE = "text_size";
     private static final String INSTANCE_FINISHED_STROKE_COLOR = "finished_stroke_color";
     private static final String INSTANCE_UNFINISHED_STROKE_COLOR = "unfinished_stroke_color";
+    private static final String INSTANCE_FINISHED_DRAWABLE = "finished_drawable";
+    private static final String INSTANCE_UNFINISHED_DRAWABLE = "unfinished_drawable";
     private static final String INSTANCE_MAX = "max";
     private static final String INSTANCE_PROGRESS = "progress";
     private static final String INSTANCE_SUFFIX = "suffix";
@@ -69,9 +83,17 @@ public class CircleProgress extends View {
         initPainters();
     }
 
+
     protected void initByAttributes(TypedArray attributes) {
         finishedColor = attributes.getColor(R.styleable.CircleProgress_circle_finished_color, default_finished_color);
         unfinishedColor = attributes.getColor(R.styleable.CircleProgress_circle_unfinished_color, default_unfinished_color);
+        finishedDrawableId = attributes.getResourceId(R.styleable.CircleProgress_circle_finished_drawable, -1);
+        unfinishedDrawableId = attributes.getResourceId(R.styleable.CircleProgress_circle_unfinished_drawable, -1);
+        if(finishedDrawableId != -1) {
+            finishedBitmap = BitmapFactory.decodeResource(getContext().getResources(), finishedDrawableId);
+        }
+        if(unfinishedDrawableId != -1)
+            unfinishedBitmap = BitmapFactory.decodeResource(getContext().getResources(), unfinishedDrawableId);
         textColor = attributes.getColor(R.styleable.CircleProgress_circle_text_color, default_text_color);
         textSize = attributes.getDimension(R.styleable.CircleProgress_circle_text_size, default_text_size);
 
@@ -160,6 +182,24 @@ public class CircleProgress extends View {
         this.invalidate();
     }
 
+    public int getFinishedDrawableId() {
+        return finishedDrawableId;
+    }
+
+    public void setFinishedDrawableId(int finishedDrawable) {
+        this.finishedDrawableId = finishedDrawable;
+        invalidate();
+    }
+
+    public int getUnfinishedDrawableId() {
+        return unfinishedDrawableId;
+    }
+
+    public void setUnfinishedDrawableId(int unfinishedDrawable) {
+        this.unfinishedDrawableId = unfinishedDrawable;
+        this.invalidate();
+    }
+
     public String getPrefixText() {
         return prefixText;
     }
@@ -202,20 +242,38 @@ public class CircleProgress extends View {
         setMeasuredDimension(widthMeasureSpec, heightMeasureSpec);
     }
 
+
     @Override protected void onDraw(Canvas canvas) {
         float yHeight = getProgress() / (float) getMax() * getHeight();
         float radius = getWidth() / 2f;
         float angle = (float) (Math.acos((radius - yHeight) / radius) * 180 / Math.PI);
         float startAngle = 90 + angle;
         float sweepAngle = 360 - angle * 2;
+        Rect unfinishedRect;
+        Rect finishedSrcRect;
+        Rect finishedDestRect;
         paint.setColor(getUnfinishedColor());
         canvas.drawArc(rectF, startAngle, sweepAngle, false, paint);
 
         canvas.save();
+
+         if(unfinishedBitmap != null) {
+            unfinishedRect= new Rect(0, 0, getWidth(), getHeight());
+            canvas.drawBitmap(unfinishedBitmap, null, unfinishedRect, null);
+        }
+
         canvas.rotate(180, getWidth() / 2, getHeight() / 2);
         paint.setColor(getFinishedColor());
         canvas.drawArc(rectF, 270 - angle, angle * 2, false, paint);
+
         canvas.restore();
+
+        if(finishedBitmap != null) {
+            finishedSrcRect = new Rect(0, getHeight() - (int)yHeight, getWidth(), getHeight());
+            finishedDestRect= new Rect(0, getHeight() - (int)yHeight, getWidth(), getHeight() );
+            canvas.drawBitmap(finishedBitmap, finishedSrcRect, finishedDestRect, null);
+        }
+
 
         // Also works.
 //        paint.setColor(getFinishedColor());
@@ -236,6 +294,8 @@ public class CircleProgress extends View {
         bundle.putFloat(INSTANCE_TEXT_SIZE, getTextSize());
         bundle.putInt(INSTANCE_FINISHED_STROKE_COLOR, getFinishedColor());
         bundle.putInt(INSTANCE_UNFINISHED_STROKE_COLOR, getUnfinishedColor());
+        bundle.putInt(INSTANCE_UNFINISHED_DRAWABLE, getUnfinishedColor());
+        bundle.putInt(INSTANCE_FINISHED_DRAWABLE, getFinishedDrawableId());
         bundle.putInt(INSTANCE_MAX, getMax());
         bundle.putInt(INSTANCE_PROGRESS, getProgress());
         bundle.putString(INSTANCE_SUFFIX, getSuffixText());
@@ -251,6 +311,8 @@ public class CircleProgress extends View {
             textSize = bundle.getFloat(INSTANCE_TEXT_SIZE);
             finishedColor = bundle.getInt(INSTANCE_FINISHED_STROKE_COLOR);
             unfinishedColor = bundle.getInt(INSTANCE_UNFINISHED_STROKE_COLOR);
+            finishedDrawableId = bundle.getInt(INSTANCE_FINISHED_DRAWABLE);
+            unfinishedDrawableId = bundle.getInt(INSTANCE_UNFINISHED_DRAWABLE);
             initPainters();
             setMax(bundle.getInt(INSTANCE_MAX));
             setProgress(bundle.getInt(INSTANCE_PROGRESS));
@@ -260,5 +322,44 @@ public class CircleProgress extends View {
             return;
         }
         super.onRestoreInstanceState(state);
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+
+        if(finishedDrawableId != -1) {
+            finishedBitmap = getCircularclip(
+                    Bitmap.createScaledBitmap(
+                            BitmapFactory.decodeResource(
+                                    getContext().getResources(), finishedDrawableId
+                            ), getWidth(), getHeight(), false)
+            );
+        }
+        if(unfinishedDrawableId != -1) {
+            unfinishedBitmap = getCircularclip(
+                    Bitmap.createScaledBitmap(
+                            BitmapFactory.decodeResource(
+                                    getContext().getResources(), unfinishedDrawableId
+                            ), getWidth(), getHeight(), false)
+            );
+        }
+    }
+
+    protected static Bitmap getCircularclip(Bitmap bitmap) {
+        Bitmap output = Bitmap.createBitmap(bitmap.getWidth(),
+                bitmap.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(output);
+
+        final Paint paint = new Paint();
+        final Rect rect = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
+
+        paint.setAntiAlias(true);
+        canvas.drawARGB(0, 0, 0, 0);
+        canvas.drawCircle(bitmap.getWidth() / 2, bitmap.getHeight() / 2,
+                bitmap.getWidth() / 2, paint);
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(bitmap, rect, rect, paint);
+        return output;
     }
 }
